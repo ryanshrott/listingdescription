@@ -1,9 +1,12 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel
 import openai
+from dotenv import load_dotenv
 import os
 import json
-from dotenv import load_dotenv
 load_dotenv()
+from pydantic import BaseModel
 
 app = FastAPI()
 
@@ -58,16 +61,28 @@ app = FastAPI()
 async def root():
     return {"greeting": "Hello, World!", "message": "Welcome to SmartBids server!"}
 
+# Define the request model
+class PropertyDescription(BaseModel):
+    description: str
+
+# Security scheme for bearer token
+security = HTTPBearer()
+
+def validate_token(auth: HTTPAuthorizationCredentials = Security(security)):
+    if auth.scheme != "Bearer" or auth.credentials != os.getenv("BEARER_TOKEN"):
+        raise HTTPException(status_code=401, detail="Invalid or missing token")
+    return
 
 @app.post("/analyze-property/")
-async def analyze_property(description: str):
+async def analyze_property(request: PropertyDescription, token: str = Depends(validate_token)):
     try:
         messages = [{"role": "system", "content": "You are an assistant specialized in analyzing and extracting data from residential property listing descriptions."},
-                    {"role": "user", "content": f"Analyze the provided residential property listing description and provide info about the property. You may respond with either yes, no or maybe. If you are unsure, respond with maybe. \nListing Description:\n{description}\n"}]
+                    {"role": "user", "content": f"Analyze the provided residential property listing description and provide info about the property. You may respond with either yes, no or maybe. If you are unsure, respond with maybe. \nListing Description:\n{request.description}\n"}]
         response = clientTogether.chat.completions.create(
                     model='mistralai/Mixtral-8x7B-Instruct-v0.1',
                     messages=messages,
                     temperature=0.0,
+                    tools=tools,
                     tool_choice={"type": "function", "function": {"name": "analyze_property"}})
         out = json.loads(response.choices[0].message.tool_calls[0].function.arguments)
         return out
