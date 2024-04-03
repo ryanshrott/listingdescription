@@ -50,7 +50,7 @@ def make_groq_request(description):
         max_tokens=3000,
         response_format={"type": "json_object"}
     )
-    return json.loads(response.choices[0].message.content)
+    return response
 
 @app.post("/analyze-description/")
 async def analyze_description(request: PropertyDescription, token: str = Depends(validate_token)):
